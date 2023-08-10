@@ -10,16 +10,13 @@ import SnapKit
 
 class ViewControllerMain: UIViewController {
     
-    var movies1 = [Result1]()
+     let viewModel = FilmsViewModel()
+    
+    var isDataLoaded = false
     
     let networkDataFetcher = NetworkDataFetcher()
-    
-    var searchResponse: Welcome? = nil
-    
     let searchController = UISearchController(searchResultsController: nil)
-    
-    let identifier = "cell"
-  
+          
     private var timer: Timer?
     
     private lazy var table: UITableView = {
@@ -27,7 +24,7 @@ class ViewControllerMain: UIViewController {
         table.translatesAutoresizingMaskIntoConstraints = false
         table.separatorStyle = .singleLine
         table.separatorColor = .gray
-        table.register(CustomCell.self, forCellReuseIdentifier: "customCell")
+        table.register(CustomCell.self, forCellReuseIdentifier: CustomCell.identifier)
         return table
     }()
     
@@ -51,7 +48,6 @@ class ViewControllerMain: UIViewController {
         searchController.searchBar.delegate = self
         navigationController?.navigationBar.prefersLargeTitles = true
         searchController.obscuresBackgroundDuringPresentation = false
-        
     }
     
     private func setupView() {
@@ -68,45 +64,71 @@ class ViewControllerMain: UIViewController {
     }
 }
 
-
-
 //MARK: - extension TableView
 
 extension ViewControllerMain: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return movies1.count
+//        viewModel.films.count
+        if isDataLoaded {
+            return viewModel.films.count
+        } else {
+            return 0
+        }
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: CustomCell.identifier, for: indexPath) as! CustomCell
         
-        cell.configure(with: movies1[indexPath.row])
-        
+        cell.configure(with: (viewModel.films[indexPath.row]))
         return cell
     }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let vc = MovieViewController()
+        vc.indicator.startAnimating()
+        guard let apiURL = URL(string: (viewModel.films[indexPath.row].posterURL)) else { return }
+        
+        vc.configure1(with: (viewModel.films[indexPath.row]))
+        
+        URLSession.shared.dataTask(with: apiURL) { data, _, _ in
+            guard let data = data else { return }
+            DispatchQueue.main.async {
+                vc.imageView.image = UIImage(data: data)
+                vc.indicator.stopAnimating()
+            }
+        }.resume()
+             
+        vc.title = viewModel.films[indexPath.row].nameEn
+    
+        navigationController?.pushViewController(vc, animated: true)
+    }
 }
-
-
 
 //MARK: -  extension SearchController
 extension ViewControllerMain: UISearchBarDelegate {
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         
-        let urlString = "https://imdb-api.com/API/Search/k_a11p9jp6/\(searchText)"//Avatar""https://imdb-api.com/swagger/index.html"
-        
+        let urlString = "https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=\(searchText)"
         timer?.invalidate()
         
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false, block: { (_) in
-            self.networkDataFetcher.fetchData(urlString: urlString) { (searchResponse) in
+            self.isDataLoaded = true
+            self.viewModel.fetchFilms(urlString: urlString) { (searchResponse) in
+                DispatchQueue.main.async {
+//                    self.table.reloadData()
+                }
                 guard let searchResponse = searchResponse else { return }
+                self.viewModel.films.append(contentsOf: searchResponse.films)
+                //self.table.reloadData()
+                self.viewModel.delegate?.didUpdateFilms()
                 
-                self.searchResponse = searchResponse
-                self.movies1.append(contentsOf: searchResponse.results)
-                
-                self.table.reloadData()
             }
+//            }
         })
+        DispatchQueue.main.asyncAfter(deadline: .now()+3) {
+            self.table.reloadData()
+        }
     }
 }

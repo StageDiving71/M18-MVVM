@@ -13,6 +13,8 @@ class CustomCell: UITableViewCell {
     
     static let identifier = "customCell"
     
+    let activityIndicator = UIActivityIndicatorView()
+    
     private lazy var movieLabel: UILabel = {
         let label = UILabel()
         label.text = "test"
@@ -40,7 +42,8 @@ class CustomCell: UITableViewCell {
         contentView.addSubview(movieLabel)
         contentView.addSubview(movieDescription)
         contentView.addSubview(movieImage)
-
+        contentView.addSubview(activityIndicator)
+                
         setupConstraints()
     }
     
@@ -50,7 +53,7 @@ class CustomCell: UITableViewCell {
     
     private func setupConstraints() {
         
-        self.movieLabel.snp.makeConstraints { make in
+               self.movieLabel.snp.makeConstraints { make in
                     make.left.equalTo(movieImage).inset(60)
                     make.top.equalToSuperview().inset(0)
                     make.bottom.equalToSuperview().inset(76)
@@ -69,14 +72,28 @@ class CustomCell: UITableViewCell {
                    make.top.equalTo(movieLabel).inset(13)
                    make.left.equalTo(movieImage).inset(59)
                }
+            
+                self.activityIndicator.snp.makeConstraints { make in
+                    make.center.equalTo(self.movieImage)
+                }
     }
     
-    func configure(with model: Result1) {
-        self.movieLabel.text = model.title
-        self.movieDescription.text = model.resultDescription
-        let url = model.image
-        if let data = try? Data(contentsOf: URL(string: url)!) {
-            self.movieImage.image = UIImage(data: data)
-        }
+    func configure(with model: Film) {
+        self.movieLabel.text = model.nameRu
+        self.movieDescription.text = model.description
+        
+        self.activityIndicator.startAnimating()
+
+        DispatchQueue.global(qos: .background).async {
+        
+            let url = model.posterURL
+            if let data = try? Data(contentsOf: URL(string: url)!) {
+              
+                DispatchQueue.main.async {
+                    self.movieImage.image = UIImage(data: data)
+                    self.activityIndicator.stopAnimating()
+                }
+            }
+            }
     }
 }
